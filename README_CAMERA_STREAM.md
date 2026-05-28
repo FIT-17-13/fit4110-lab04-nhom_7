@@ -1,13 +1,14 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/VV7xVEGC)
-# FIT4110_lab04_docker_packaging
+# FIT4110_lab04_team_camera_docker_packaging
 
 **Học phần:** FIT4110 – Dịch vụ kết nối và Công nghệ nền tảng  
 **Buổi 4:** Đóng gói service với Docker & tư duy công nghệ nền tảng  
 **Case study:** Smart Campus Operations Platform  
+**Nhánh nội dung:** team-camera nối tiếp từ Lab 03, nay tập trung vào đóng gói service bằng Docker container  
 **Repo nền:** `FIT4110_lab03_postman_mock_testing`
 
-> Lab 03 đã có OpenAPI contract, Postman Collection, Mock Server và Newman report.  
-> Lab 04 dùng lại logic đó để kiểm tra một điều mới: **service có chạy ổn khi được đóng gói thành Docker container không?**
+> Lab 03 của team-camera đã có OpenAPI contract, Postman Collection, Mock Server và Newman report.  
+> Lab 04 dùng lại logic đó để kiểm tra một điều mới: **service camera có chạy ổn khi được đóng gói thành Docker container không?**
 
 ---
 
@@ -31,22 +32,23 @@ OpenAPI Contract
 → Evidence
 ```
 
-Lab 04 hiện đã đồng bộ lại với contract IoT của Lab 03 theo payload:
+Lab 04 hiện có thể diễn giải lại theo contract camera của Lab 03 với payload sự kiện như sau:
 
 ```json
 {
-  "device_id": "ESP32-LAB-A01",
-  "metric": "temperature",
-  "value": 31.5,
-  "unit": "celsius",
-  "timestamp": "2026-05-13T08:30:00+07:00"
+  "eventType": "camera.motion.detected",
+  "eventId": "0196fb3d-4ad7-7d1e-9f49-5d5148d2babc",
+  "cameraId": "CAM-007",
+  "sourceService": "camera-stream",
+  "occurredAt": "2026-05-10T08:00:00Z",
+  "confidence": 0.92
 }
 ```
 
-Boundary dùng trong bài:
+Boundary dùng trong bài có thể được mô tả theo ngữ cảnh camera, ví dụ:
 
 ```text
-temperature: -40 đến 80
+confidence: 0.00 đến 1.00
 ```
 
 Thông điệp chính của buổi học:
@@ -60,7 +62,7 @@ Thông điệp chính của buổi học:
 
 Sau khi hoàn thành Lab 04, mỗi nhóm cần làm được:
 
-- Viết được `Dockerfile` cho service của nhóm.
+- Viết được `Dockerfile` cho service camera của nhóm.
 - Dùng `.dockerignore` để giảm context build.
 - Tách cấu hình runtime qua `.env.example`.
 - Không commit secret thật vào repo.
@@ -70,6 +72,7 @@ Sau khi hoàn thành Lab 04, mỗi nhóm cần làm được:
 - Run được container từ image.
 - Chạy lại Postman Collection của Lab 03 trên container.
 - Kiểm tra được functional, auth, negative, boundary và schema lỗi `ProblemDetails`.
+- Giữ được hành vi nhất quán giữa local runtime và container runtime.
 - Xuất Newman report làm bằng chứng.
 - Viết được `RUN_LOCAL.md` hướng dẫn người khác chạy lại trong 3–5 bước.
 
@@ -78,7 +81,7 @@ Sau khi hoàn thành Lab 04, mỗi nhóm cần làm được:
 ## 3. Cấu trúc repo
 
 ```text
-FIT4110_lab04_docker_packaging/
+FIT4110_lab04_team_camera_docker_packaging/
 ├── README.md
 ├── RUN_LOCAL.md
 ├── Dockerfile
@@ -89,6 +92,9 @@ FIT4110_lab04_docker_packaging/
 ├── package.json
 ├── requirements.txt
 ├── src/
+│   ├── camera_stream_service/
+│   │   ├── __init__.py
+│   │   └── main.py
 │   └── iot_app/
 │       ├── __init__.py
 │       └── main.py
@@ -96,10 +102,10 @@ FIT4110_lab04_docker_packaging/
 │   └── iot-ingestion.openapi.yaml
 ├── postman/
 │   ├── collections/
-│   │   └── FIT4110_lab04_iot_docker.postman_collection.json
+│   │   └── FIT4110_lab04_camera_docker.postman_collection.json
 │   └── environments/
-│       ├── FIT4110_lab04_mock.postman_environment.json
-│       └── FIT4110_lab04_local.postman_environment.json
+│       ├── FIT4110_lab04_camera_mock.postman_environment.json
+│       └── FIT4110_lab04_camera_local.postman_environment.json
 ├── mock-data/
 ├── scripts/
 ├── docs/
@@ -196,7 +202,7 @@ curl http://localhost:8000/health
 Chạy Newman với local environment:
 
 ```bash
-npm run test:local
+npm run test:camera:local
 ```
 
 Hoặc dùng script:
@@ -212,7 +218,7 @@ reports/
 ```
 
 ---
- 
+
 ## 8. Các lệnh nhanh bằng Makefile
 
 ```bash
@@ -230,12 +236,20 @@ make stop
 
 ## 9. Bài làm của từng nhóm
 
-Mỗi nhóm dùng repo này làm mẫu, sau đó thay phần IoT bằng service của mình.
+Mỗi nhóm dùng repo này làm mẫu, sau đó thay phần demo mặc định bằng service của mình.
+
+Với team-camera, trọng tâm không chỉ là build được image mà còn là chứng minh service camera vẫn giữ nguyên hành vi khi chạy trong container:
+
+- Docker image phải chứa đúng runtime của service camera.
+- Container phải khởi động được mà không cần thao tác thủ công bên trong.
+- `GET /health` phải trả về trạng thái sẵn sàng để Newman và Docker healthcheck cùng dùng lại.
+- Nếu service có xử lý ảnh hoặc stream, ưu tiên base image gọn và chỉ cài dependency cần thiết.
+- Cấu hình như cổng, token, URL downstream nên đi qua biến môi trường thay vì hardcode.
 
 | Nhóm | Cần thay đổi |
 |---|---|
 | `team-iot` | Có thể dùng mẫu này trực tiếp, mở rộng thêm endpoint từ Lab 03 |
-| `team-camera` | Thay `src/` bằng Camera Stream service, thêm OpenCV headless |
+| `team-camera` | Đóng gói Camera Stream service, chú ý các dependency xử lý ảnh/headless và healthcheck |
 | `team-gate` | Thay bằng Access Gate service, lưu ý biến môi trường DB |
 | `team-vision` | Thay bằng AI Vision service, chuẩn bị model YOLOv8n hoặc mock model |
 | `team-analytics` | Thay bằng Analytics service, chưa bắt buộc TimescaleDB trong Lab 04 |
@@ -270,7 +284,7 @@ v0.1.0-<team>
 Ví dụ:
 
 ```bash
-docker tag fit4110/iot-ingestion:lab04 ghcr.io/<owner>/team-iot:v0.1.0-team-iot
+docker tag fit4110/camera-analytics:lab04 ghcr.io/vominhquan/nhom-7:v0.1.0-team-camera
 ```
 
 ---
@@ -282,9 +296,9 @@ Dockerfile
 .dockerignore
 .env.example
 RUN_LOCAL.md
-contracts/<team>.openapi.yaml
-postman/collections/<team>.postman_collection.json
-postman/environments/<team>_local.postman_environment.json
+contracts/camera-analytics.openapi.yaml hoặc contracts/ai-vision.openapi.yaml
+postman/collections/FIT4110_lab03_camera_analytics.postman_collection.json
+postman/environments/FIT4110_lab03_camera_analytics_local.postman_environment.json
 reports/newman-lab04-local.xml
 reports/newman-lab04-local.html
 ảnh chụp /health hoặc log container
